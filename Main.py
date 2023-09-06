@@ -6,7 +6,7 @@ import requests
 import ultralytics.models.yolo
 import ultralytics.utils
 from PIL import Image
-import numpy as np
+import numpy as npllytics
 from typing import Tuple, Dict
 from ultralytics import YOLO
 import os
