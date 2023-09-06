@@ -3,12 +3,9 @@ from flask import Flask, render_template, Response, request
 import cv2
 import os
 import signal
-from ultralytics import yolo
+from ultralytics import YOLO
 import numpy as np
 from pathlib import Path
-import requests
-from PIL import Image
-
 
 # global variable stores the people count
 count_var = 0
@@ -16,65 +13,90 @@ count_var = 0
 # creating flask app
 app = Flask(__name__)
 
-# home route
-@app.route("/")
-def index():
-    return render_template('index.html')
+# Define the segmentation model name
+SEG_MODEL_NAME = "yolov8n-seg"
 
-
+# Create a directory for models
 models_dir = Path('models')
 models_dir.mkdir(exist_ok=True)
 
-def get_frame_from_stream(url: str) -> np.ndarray:
-    response = requests.get(url)
-    if response.status_code == 200:
-        frame = np.asarray(bytearray(response.content), dtype=np.uint8)
-        return cv2.imdecode(frame, cv2.IMREAD_COLOR)
-    else:
-        return None
-
 def generate_frames(ip_address):
 
-    # access the global variable
+    # Access the global variable
     global count_var
 
-    # Replace the IMAGE_PATH with the URL of the video stream
-    STREAM_URL = ip_address
-    # STREAM_URL = "http://192.168.137.156:8080/video?type=some.mjpeg"
-
-    SEG_MODEL_NAME = "yolov8n-seg"
+    # Load the segmentation model
     seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt')
+
+    # Open the video capture
+    cap = cv2.VideoCapture(ip_address)
 
     while True:
 
-         # Get the frame from the stream
-        frame = get_frame_from_stream(STREAM_URL)
-
-        if frame is None:
-            print("Failed to retrieve frame from the stream.")
+        # ---------- capturing frames-----------#
+        ret , frame = cap.read()
+        if not ret :
             break
 
-        # Perform inference on the frame
+        # Resize frames
+        frame = cv2.resize(frame, (1400, 800))
+
+        # List that stores the centroids of the current frame
+        centr_pt_cur_fr = []
+
+        # Perform segmentation on the frame
         res = seg_model(frame)
 
-        result_pil_image = Image.fromarray(res[0].plot()[:, :, ::-1])
+        # Get class labels, confidence levels, and bounding boxes
+        classes = np.array(res[0].boxes.cls.cpu(), dtype="int")
+        confidence = np.array(res[0].boxes.conf.cpu())
+        bboxes = np.array(res[0].boxes.xyxy.cpu(), dtype="int")
 
-        # Convert the PIL image to an array to use with OpenCV
-        result_cv_image = np.array(result_pil_image)
+        # Get indexes of the detections containing persons
+        idx = [i for i, c in enumerate(classes) if c == 0]
 
-        # Display the result in the OpenCV window
-        cv2.imshow("Result Image", result_cv_image)
+        # Bounding boxes for person detections
+        bbox = [bboxes[i] for i in idx]
 
-        # Wait for 1 second (1000 milliseconds) before displaying the next frame
-        cv2.waitKey(500)
+        # Convert bbox to a multidimensional list
+        box_multi_list = [arr.tolist() for arr in bbox]
 
-        # if the q is pressed the the loop is broken
+        # Draw bounding boxes
+        for box in box_multi_list:
+            (x, y, x2, y2) = box
+            cv2.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
+            cx = int((x + x2) / 2)
+            cy = int((y + y2) / 2)
+            centr_pt_cur_fr.append((cx, cy))
+            cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
+
+        # Count total people in the footage
+        head_count = len(centr_pt_cur_fr)
+        count_var = head_count
+
+        # Display the face count on the screen
+        cv2.putText(frame, f'Head Count: {head_count}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+
+        # If 'q' is pressed, break the loop
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
 
+        # Convert the frame to JPEG and yield it
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    # Release resources
+    cap.release()
     cv2.destroyAllWindows()
-    
+
+        
+# home route
+@app.route("/")
+def index():
+    return render_template('index.html')
 
 # video feed route
 @app.route("/video_feed")
