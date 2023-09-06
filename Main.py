@@ -1,7 +1,6 @@
 import torch
 import requests
 
-
 # from ultralytics.yolo.utils.plotting 
 
 import ultralytics.models.yolo
