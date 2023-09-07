@@ -1,8 +1,5 @@
 import torch
 import requests
-
-# from ultralytics.yolo.utils.plotting 
-
 import ultralytics.models.yolo
 import ultralytics.utils
 from PIL import Image
@@ -12,21 +9,19 @@ from ultralytics import YOLO
 import os
 from pathlib import Path
 import cv2
-# Fetch the notebook utils script from the openvino_notebooks repo
 import urllib.request
 from random import random
 
-# urllib.request.urlretrieve(
-#     url='https://raw.githubusercontent.com/openvinotoolkit/openvino_notebooks/main/notebooks/utils/notebook_utils.py',
-#     filename='../openvino_notebooks/notebooks/230-yolov8-optimization/notebook_utils.py'
-# )
+# Check for GPU availability
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Initialize the YOLO model
 models_dir = Path('models')
 models_dir.mkdir(exist_ok=True)
+SEG_MODEL_NAME = "yolov8n-seg"
+seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt').to(device)
 
-# Initialize an empty list for box_multi_list
-box_multi_list = []
-
+# Function to get a frame from the video stream
 def get_frame_from_stream(url: str) -> np.ndarray:
     response = requests.get(url)
     if response.status_code == 200:
@@ -35,37 +30,39 @@ def get_frame_from_stream(url: str) -> np.ndarray:
     else:
         return None
 
-
-# Replace the IMAGE_PATH with the URL of the video stream
+# Replace the STREAM_URL with the URL of the video stream
 STREAM_URL = "http://192.168.29.187:8080/shot.jpg"
 # STREAM_URL = "http://192.168.137.156:8080/video?type=some.mjpeg"
-SEG_MODEL_NAME = "yolov8n-seg"
-seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt')
+
+# Initialize an empty list for box_multi_list
+box_multi_list = []
 
 while True:
+
     # Get the frame from the stream
     frame = get_frame_from_stream(STREAM_URL)
-    frame = cv2.resize(frame, (1200, 600))
+    frame = cv2.resize(frame, (640, 640))
 
     if frame is None:
         print("Failed to retrieve frame from the stream.")
         break
 
+     # Convert BGR to RGB channel order
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Normalize the frame to have pixel values in the range [0, 1]
+    frame = frame / 255.0
+
+    # Move the frame data to the GPU
+    frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).unsqueeze(0).to(device)
+
     # Perform inference on the frame
-    res = seg_model(frame)
+    res = seg_model(frame_tensor)
 
-    # result_pil_image = Image.fromarray(res[0].plot()[:, :, ::-1])
+    # Initialize box_multi_list for this frame
+    box_multi_list = []
 
-    # # Convert the PIL image to an array to use with OpenCV
-    # result_cv_image = np.array(result_pil_image)
-
-    # # Display the result in the OpenCV window
-    # cv2.imshow("Result Image", result_cv_image)
-
-    # # Wait for 1 second (1000 milliseconds) before displaying the next frame
-    # cv2.waitKey(500)
-
-        # --------- list that stores the centroids of the current frame---------#
+    # --------- list that stores the centroids of the current frame---------#
     centr_pt_cur_fr = []
 
     # results = seg_model(frame)
@@ -99,8 +96,6 @@ while True:
 
         # Convert to bbox to multidimensional list
         box_multi_list = [arr.tolist() for arr in bbox]
-        # print("this are final human detected boxes")
-        # print(box_multi_list)
 
     # ------------ drawing of bounding boxes-------------#
     for box in box_multi_list:
@@ -112,22 +107,17 @@ while True:
         centr_pt_cur_fr.append((cx, cy))
         cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
 
-    # print("this are the centroids in the current frame")
-    # print(centr_pt_cur_fr)
-
     # ------------- counting of total people in the footage ------------#
     head_count = len(centr_pt_cur_fr)
 
     # counting the number of faces with count_var variable
     count_var = head_count
 
-    # displaying the face count on the screen for experiment purpose
-    # cv2.putText(frame, f'{head_count}', (10, 30),
-    #             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
     text = f'Head Count: {head_count}'
     cv2.putText(frame, text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 3, cv2.LINE_AA)
 
     cv2.imshow("Result Image", frame)
+    
     # Check if the user presses the 'q' key to exit the loop
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
