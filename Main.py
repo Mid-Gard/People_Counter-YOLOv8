@@ -24,6 +24,8 @@ from random import random
 models_dir = Path('models')
 models_dir.mkdir(exist_ok=True)
 
+# Initialize an empty list for box_multi_list
+box_multi_list = []
 
 def get_frame_from_stream(url: str) -> np.ndarray:
     response = requests.get(url)
