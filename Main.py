@@ -6,7 +6,7 @@ import requests
 import ultralytics.models.yolo
 import ultralytics.utils
 from PIL import Image
-import numpy as npllytics
+import numpy as np
 from typing import Tuple, Dict
 from ultralytics import YOLO
 import os
@@ -100,15 +100,6 @@ while True:
         # print("this are final human detected boxes")
         # print(box_multi_list)
 
-    # ------------ drawing of bounding boxes-------------#
-    for box in box_multi_list:
-        (x, y, x2, y2) = box
-
-        cv2.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
-        cx = int((x+x2)/2)
-        cy = int((y+y2)/2)
-        centr_pt_cur_fr.append((cx, cy))
-        cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
 
     # print("this are the centroids in the current frame")
     # print(centr_pt_cur_fr)
