@@ -1,61 +1,45 @@
 import torch
-import requests
 import ultralytics.models.yolo
-import ultralytics.utils
-from PIL import Image
-import numpy as np
-from typing import Tuple, Dict
 from ultralytics import YOLO
-import os
-from pathlib import Path
 import cv2
-import urllib.request
-from random import random
+import numpy as np
 
 # Check for GPU availability
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Initialize the YOLO model
-models_dir = Path('models')
-models_dir.mkdir(exist_ok=True)
+models_dir = "models"  # Update this to your model directory
 SEG_MODEL_NAME = "yolov8n-seg"
-seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt').to(device)
-
-
-# Function to get a frame from the video stream
-def get_frame_from_stream(url: str) -> np.ndarray:
-    response = requests.get(url)
-    if response.status_code == 200:
-        frame = np.asarray(bytearray(response.content), dtype=np.uint8)
-        return cv2.imdecode(frame, cv2.IMREAD_COLOR)
-    else:
-        return None
+seg_model = YOLO(models_dir + f'/{SEG_MODEL_NAME}.pt').to(device)
 
 # Replace the STREAM_URL with the URL of the video stream
-STREAM_URL = "http://192.168.29.187:8080/shot.jpg"
-# STREAM_URL = "http://192.168.137.156:8080/video?type=some.mjpeg"
+STREAM_URL = "rtsp://admin:Crl@12345@192.168.0.102:554/cam/realmonitor?channel=5&subtype=0"
+
+# Create a VideoCapture object for the RTSP stream
+cap = cv2.VideoCapture(STREAM_URL)
 
 # Initialize an empty list for box_multi_list
 box_multi_list = []
 
 while True:
+    # Read a frame from the RTSP stream
+    ret, frame = cap.read()
 
-    # Get the frame from the stream
-    frame = get_frame_from_stream(STREAM_URL)
-    frame = cv2.resize(frame, (640, 640))
-
-    if frame is None:
+    if not ret:
         print("Failed to retrieve frame from the stream.")
         break
 
-     # Convert BGR to RGB channel order
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # Resize the frame if necessary
+    frame = cv2.resize(frame, (640, 640))
+
+    # Convert BGR to RGB channel order
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     # Normalize the frame to have pixel values in the range [0, 1]
-    frame = frame / 255.0
+    frame_normalized = frame_rgb / 255.0
 
     # Move the frame data to the GPU
-    frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).unsqueeze(0).to(device)
+    frame_tensor = torch.from_numpy(frame_normalized).permute(2, 0, 1).unsqueeze(0).to(device)
 
     # Perform inference on the frame
     res = seg_model(frame_tensor)
@@ -63,7 +47,7 @@ while True:
     # Initialize box_multi_list for this frame
     box_multi_list = []
 
-    # --------- list that stores the centroids of the current frame---------#
+  # --------- list that stores the centroids of the current frame---------#
     centr_pt_cur_fr = []
 
     # results = seg_model(frame)
@@ -117,10 +101,13 @@ while True:
     text = f'Head Count: {head_count}'
     cv2.putText(frame, text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 3, cv2.LINE_AA)
 
+    # Display the frame
     cv2.imshow("Result Image", frame)
-    
+
     # Check if the user presses the 'q' key to exit the loop
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
+# Release the VideoCapture object and close OpenCV windows
+cap.release()
 cv2.destroyAllWindows()
