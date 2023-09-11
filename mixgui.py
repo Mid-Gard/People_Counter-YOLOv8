@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from pathlib import Path
 from ultralytics import YOLO
-from tkinter import ImageTk
+from PIL import ImageTk
 import requests
 
 # Check for GPU availability
@@ -22,8 +22,6 @@ seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt').to(device)
 root = tk.Tk()
 root.title("Object Detection - Saro Farm")
 
-# Maximize the window
-root.state('zoomed')
 
 # Create a border between the two columns
 separator = ttk.Separator(root, orient="vertical")
@@ -73,6 +71,9 @@ def perform_object_detection():
 
     # Normalize the frame to have pixel values in the range [0, 1]
     frame = frame / 255.0
+    
+    # Convert the frame to uint8
+    frame = (frame * 255).astype(np.uint8)
 
     # Move the frame data to the GPU
     frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).unsqueeze(0).to(device)
@@ -82,8 +83,39 @@ def perform_object_detection():
 
     # Initialize box_multi_list for this frame
     box_multi_list = []
+    
+    
+    # --------- list that stores the centroids of the current frame---------#
+    centr_pt_cur_fr = []
 
-    # ... (your object detection code) ...
+    # results = seg_model(frame)
+    result = res[0]
+    # ------- to get the classes of the yolo model to filter out the people---------------#
+    classes = np.array(result.boxes.cls.cpu(), dtype="int")
+    # print("this is classes:", classes)
+
+    # ---------confidence level of detections-----------#
+    confidence = np.array(result.boxes.conf.cpu())
+    # print("this is confidence:", confidence)
+
+    # --------- anarray of bounding boxes---------------#
+    bboxes = np.array(result.boxes.xyxy.cpu(), dtype="int")
+    # print("this is boxes", bboxes)
+
+    # -------- getting indexes of the detections containing persons--------#
+    idx = []
+    for i in range(0, len(classes)):
+        if classes[i] == 0:
+            idx.append(i)
+
+    # print("these are indexes:", idx)
+
+
+    text = f'Head Count: To be shown from terminal data'
+    cv2.putText(frame, text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 3, cv2.LINE_AA)
+
+    cv2.imshow("Result Image", frame)
+    
 
     # Convert the OpenCV frame to a format that can be displayed in tkinter
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -107,7 +139,7 @@ def get_frame_from_stream(url: str) -> np.ndarray:
         return None
 
 # Replace the STREAM_URL with the URL of the video stream
-STREAM_URL = "http://192.168.29.187:8080/shot.jpg"
+STREAM_URL = "http://192.168.29.188:8080/shot.jpg"
 
 # Start the object detection loop in the background
 perform_object_detection()
