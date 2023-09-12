@@ -152,16 +152,16 @@ dropdown.grid(column=0, row=0, padx=5, pady=5, sticky=tk.W)
 dropdown.bind("<<ComboboxSelected>>", dropdown_selected)
 
 # Column 2: Buttons
-button_start = ttk.Button(main_frame, text="Start Video", command=start_video_feed, style="Professional.TButton")
+button_start = ttk.Button(main_frame, text="Start Video", command=start_video_feed, style="Black.TButton")
 button_start.grid(column=1, row=0, padx=5, pady=5, sticky=tk.W)
 
-button_stop = ttk.Button(main_frame, text="Stop Video", command=stop_video_feed, style="Professional.TButton")
+button_stop = ttk.Button(main_frame, text="Stop Video", command=stop_video_feed, style="Black.TButton")
 button_stop.grid(column=1, row=1, padx=5, pady=5, sticky=tk.W)
 
-button_extra1 = ttk.Button(main_frame, text="Extra Button 1", style="Professional.TButton")
+button_extra1 = ttk.Button(main_frame, text="Extra Button 1", style="Black.TButton")
 button_extra1.grid(column=1, row=2, padx=5, pady=5, sticky=tk.W)
 
-button_extra2 = ttk.Button(main_frame, text="Extra Button 2", style="Professional.TButton")
+button_extra2 = ttk.Button(main_frame, text="Extra Button 2", style="Black.TButton")
 button_extra2.grid(column=1, row=3, padx=5, pady=5, sticky=tk.W)
 
 # Column 3: Video Feed
