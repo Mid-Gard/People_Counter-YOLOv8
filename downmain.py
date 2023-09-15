@@ -9,6 +9,7 @@ import torch
 import ultralytics.models.yolo
 from pathlib import Path
 from ultralytics import YOLO
+import sys
 
 # Check for GPU availability
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -21,7 +22,7 @@ seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt').to(device)
 
 # Define stream URLs
 STREAM_URLS = [
-    "http://192.168.29.188:8080/shot.jpg",
+    "http://192.168.29.187:8080/shot.jpg",
     "http://192.1",
     "http://your-third-stream-url.com",
     "http://your-fourth-stream-url.com",
@@ -33,6 +34,7 @@ STREAM_URL = STREAM_URLS[0]
 # Create a Tkinter window
 root = tk.Tk()
 root.title("People Counter GUI")
+
 
 # Function to get a frame from the video stream
 def get_frame_from_stream(url: str) -> np.ndarray:
@@ -56,11 +58,51 @@ def stop_video_feed():
     global is_video_playing
     is_video_playing = False
 
+# Initialize recording flag and VideoWriter
+is_recording = False
+record_writer = None
+
+# Function to update the recording status message
+def update_recording_status():
+    if is_recording:
+        recording_status_label.config(text="Recording: ON", foreground="red")
+    else:
+        recording_status_label.config(text="Recording: OFF", foreground="green")
+
+# Function to start video recording
+def start_video_recording():
+    global is_recording, record_writer
+    
+    if not is_recording:
+        # Start recording
+        is_recording = True
+        selected_option = dropdown_var.get()
+        output_filename = f"recorded_{selected_option}.mp4"
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        record_writer = cv2.VideoWriter(output_filename, fourcc, 20.0, (640, 480))
+        button_record.config(text="Stop Recording/Save")
+        update_recording_status()  # Update the recording status message
+
+# Function to stop video recording and save
+def stop_and_save_video():
+    global is_recording, record_writer
+    
+    if is_recording:
+        # Stop recording
+        is_recording = False
+        record_writer.release()
+        button_record.config(text="Start Recording")
+        update_recording_status()  # Update the recording status message
+        print("Recording stopped and saved.")
+
+
 # Function to process the video feed
 def process_video_feed():
     while is_video_playing:
         frame = get_frame_from_stream(STREAM_URL)
         if frame is not None:
+            if is_recording:
+                record_writer.write(frame)  # Write frame to the recording
             frame = cv2.resize(frame, (640, 640))
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # frame = frame / 255.0
@@ -115,6 +157,18 @@ def process_video_feed():
             print("Failed to retrieve frame from the stream.")
             break
 
+# Function to handle window close event
+def on_closing():
+    global is_video_playing
+    if is_video_playing:
+        stop_video_feed()
+    if is_recording:
+        stop_and_save_video()
+    root.destroy()
+
+# Bind the window close event to the on_closing function
+root.protocol("WM_DELETE_WINDOW", on_closing)
+
 options = ["Stream 1", "Stream 2", "Stream 3", "Stream 4"]
 
 def dropdown_selected(event):
@@ -151,18 +205,24 @@ dropdown.set(options[0])
 dropdown.grid(column=0, row=0, padx=5, pady=5, sticky=tk.W)
 dropdown.bind("<<ComboboxSelected>>", dropdown_selected)
 
+# Create a label to display recording status
+recording_status_label = ttk.Label(main_frame, text="Recording: OFF", foreground="green")
+recording_status_label.grid(column=1, row=4, padx=5, pady=5, sticky=tk.W)
+
 # Column 2: Buttons
 button_start = ttk.Button(main_frame, text="Start Video", command=start_video_feed, style="Black.TButton")
 button_start.grid(column=1, row=0, padx=5, pady=5, sticky=tk.W)
 
-button_stop = ttk.Button(main_frame, text="Stop Video", command=stop_video_feed,style="Black.TButton" )
+button_stop = ttk.Button(main_frame, text="Stop Video", command=stop_video_feed, style="Black.TButton" )
 button_stop.grid(column=1, row=1, padx=5, pady=5, sticky=tk.W)
 
-button_extra1 = ttk.Button(main_frame, text="Extra Button 1", style="Black.TButton")
-button_extra1.grid(column=1, row=2, padx=5, pady=5, sticky=tk.W)
+# New Record Button
+button_record = ttk.Button(main_frame, text="Start Recording", command=start_video_recording, style="Black.TButton")
+button_record.grid(column=1, row=2, padx=5, pady=5, sticky=tk.W)
 
-button_extra2 = ttk.Button(main_frame, text="Extra Button 2", style="Black.TButton")
-button_extra2.grid(column=1, row=3, padx=5, pady=5, sticky=tk.W)
+# New Stop Recording/Save Button
+button_stop_record = ttk.Button(main_frame, text="Stop Recording/Save", command=stop_and_save_video, style="Black.TButton")
+button_stop_record.grid(column=1, row=3, padx=5, pady=5, sticky=tk.W)
 
 # Column 3: Video Feed
 video_label = ttk.Label(main_frame)
