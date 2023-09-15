@@ -62,17 +62,7 @@ while True:
     confidence = np.array(result.boxes.conf.cpu())
     # print("this is confidence:", confidence)
 
-    # --------- anarray of bounding boxes---------------#
-    bboxes = np.array(result.boxes.xyxy.cpu(), dtype="int")
-    # print("this is boxes", bboxes)
 
-    # -------- getting indexes of the detections containing persons--------#
-    idx = []
-    for i in range(0, len(classes)):
-        if classes[i] == 0:
-            idx.append(i)
-
-    # print("these are indexes:", idx)
 
 
     cv2.imshow("Result Image", frame)
