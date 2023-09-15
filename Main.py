@@ -36,7 +36,7 @@ def get_frame_from_stream(url: str) -> np.ndarray:
 
 # Replace the IMAGE_PATH with the URL of the video stream
 STREAM_URL = "http://192.168.29.187:8080/shot.jpg"
-# STREAM_URL = "http://192.168.137.156:8080/video?type=some.mjpeg"
+# STREAM_URL = "http://192.168.29.187:8080/video?type=some.mjpeg"
 SEG_MODEL_NAME = "yolov8n-seg"
 seg_model = YOLO(models_dir / f'{SEG_MODEL_NAME}.pt')
 
